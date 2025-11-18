@@ -17,12 +17,12 @@ const Home: NextPage = ({ currentPhoto }: { currentPhoto: ImageProps }) => {
   return (
     <>
       <Head>
-        <title>Next.js Conf 2022 Photos</title>
+        <title>IMAGE GROUND</title>
         <meta property="og:image" content={currentPhotoUrl} />
         <meta name="twitter:image" content={currentPhotoUrl} />
       </Head>
       <main className="mx-auto max-w-[1960px] p-4">
-        <Carousel currentPhoto={currentPhoto} index={index} />
+        <Carousel currentPhoto={currentPhoto} images={[currentPhoto]} />
       </main>
     </>
   );
@@ -42,6 +42,8 @@ export const getStaticProps: GetStaticProps = async (context) => {
       width: result.width,
       public_id: result.public_id,
       format: result.format,
+      created_at: result.created_at || new Date().toISOString(),
+      isUserUploaded: Boolean(result.tags && result.tags.includes('user_uploaded')),
     });
     i++;
   }
