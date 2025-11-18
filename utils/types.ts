@@ -5,7 +5,9 @@ export interface ImageProps {
   width: string;
   public_id: string;
   format: string;
+  created_at: string;
   blurDataUrl?: string;
+  isUserUploaded: boolean; // Always boolean - true for user uploads, false for original gallery
 }
 
 export interface SharedModalProps {
@@ -16,4 +18,5 @@ export interface SharedModalProps {
   closeModal: () => void;
   navigation: boolean;
   direction?: number;
+  onDelete?: (imageId: number) => void;
 }

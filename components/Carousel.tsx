@@ -3,14 +3,16 @@ import { useRouter } from "next/router";
 import useKeypress from "react-use-keypress";
 import type { ImageProps } from "../utils/types";
 import { useLastViewedPhoto } from "../utils/useLastViewedPhoto";
-import SharedModal from "./SharedModal";
+import Modal from "./Modal";
 
 export default function Carousel({
-  index,
+  images,
   currentPhoto,
+  onDelete,
 }: {
-  index: number;
+  images: ImageProps[];
   currentPhoto: ImageProps;
+  onDelete?: (imageId: number) => void;
 }) {
   const router = useRouter();
   const [, setLastViewedPhoto] = useLastViewedPhoto();
@@ -20,10 +22,6 @@ export default function Carousel({
     router.push("/", undefined, { shallow: true });
   }
 
-  function changePhotoId(newVal: number) {
-    return newVal;
-  }
-
   useKeypress("Escape", () => {
     closeModal();
   });
@@ -31,6 +29,7 @@ export default function Carousel({
   return (
     <div className="fixed inset-0 flex items-center justify-center">
       <button
+        title="close modal"
         className="absolute inset-0 z-30 cursor-default bg-black backdrop-blur-2xl"
         onClick={closeModal}
       >
@@ -42,12 +41,10 @@ export default function Carousel({
           priority={true}
         />
       </button>
-      <SharedModal
-        index={index}
-        changePhotoId={changePhotoId}
-        currentPhoto={currentPhoto}
-        closeModal={closeModal}
-        navigation={false}
+      <Modal
+        images={images}
+        onClose={closeModal}
+        onDelete={onDelete}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import {
   ArrowUturnLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
@@ -14,7 +15,6 @@ import { variants } from "../utils/animationVariants";
 import downloadPhoto from "../utils/downloadPhoto";
 import { range } from "../utils/range";
 import type { ImageProps, SharedModalProps } from "../utils/types";
-import Twitter from "./Icons/Twitter";
 
 export default function SharedModal({
   index,
@@ -24,28 +24,52 @@ export default function SharedModal({
   navigation,
   currentPhoto,
   direction,
+  onDelete,
 }: SharedModalProps) {
   const [loaded, setLoaded] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Find current image by ID instead of index
+  let currentImage = images ? images.find(img => img.id === index) || images[0] : currentPhoto;
+  let currentImageIndex = images ? images.findIndex(img => img.id === index) : 0;
 
   let filteredImages = images?.filter((img: ImageProps) =>
-    range(index - 15, index + 15).includes(img.id),
+    range(Math.max(0, currentImageIndex - 15), Math.min(images.length - 1, currentImageIndex + 15)).includes(images.findIndex(i => i.id === img.id))
   );
 
   const handlers = useSwipeable({
     onSwipedLeft: () => {
-      if (index < images?.length - 1) {
-        changePhotoId(index + 1);
+      if (currentImageIndex < (images?.length || 0) - 1) {
+        const nextImage = images?.[currentImageIndex + 1];
+        if (nextImage) {
+          changePhotoId(nextImage.id);
+        }
       }
     },
     onSwipedRight: () => {
-      if (index > 0) {
-        changePhotoId(index - 1);
+      if (currentImageIndex > 0) {
+        const prevImage = images?.[currentImageIndex - 1];
+        if (prevImage) {
+          changePhotoId(prevImage.id);
+        }
       }
     },
     trackMouse: true,
   });
 
-  let currentImage = images ? images[index] : currentPhoto;
+  // Safety check for currentImage
+  if (!currentImage) {
+    return (
+      <div className="relative z-50 flex w-full h-full items-center justify-center p-4">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p>Loading image...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <MotionConfig
@@ -55,12 +79,41 @@ export default function SharedModal({
       }}
     >
       <div
-        className="relative z-50 flex aspect-[3/2] w-full max-w-7xl items-center wide:h-full xl:taller-than-854:h-auto"
+        className="relative z-50 flex w-full h-full items-center justify-center p-4"
         {...handlers}
       >
+        {/* Loading indicator */}
+        {imageLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-30">
+            <div className="text-white text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+              <p className="text-lg">Loading image...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error state */}
+        {imageError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-30">
+            <div className="text-white text-center">
+              <div className="text-red-500 text-6xl mb-4">⚠️</div>
+              <p className="text-lg mb-4">Failed to load image</p>
+              <button
+                onClick={() => {
+                  setImageError(false);
+                  setImageLoading(true);
+                }}
+                className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Main image */}
-        <div className="w-full overflow-hidden">
-          <div className="relative flex aspect-[3/2] items-center justify-center">
+        <div className="w-full h-full flex items-center justify-center overflow-hidden">
+          <div className="relative flex items-center justify-center max-w-full max-h-full">
             <AnimatePresence initial={false} custom={direction}>
               <motion.div
                 key={index}
@@ -69,19 +122,34 @@ export default function SharedModal({
                 initial="enter"
                 animate="center"
                 exit="exit"
-                className="absolute"
+                className="absolute flex items-center justify-center"
               >
                 <Image
-                  src={`https://res.cloudinary.com/${
-                    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-                  }/image/upload/c_scale,${navigation ? "w_1280" : "w_1920"}/${
-                    currentImage.public_id
-                  }.${currentImage.format}`}
-                  width={navigation ? 1280 : 1920}
-                  height={navigation ? 853 : 1280}
+                  src={`https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+                    }/image/upload/c_fit,${navigation ? "w_1920,h_1080" : "w_2560,h_1440"}/${currentImage.public_id
+                    }.${currentImage.format}`}
+                  width={navigation ? 1920 : 2560}
+                  height={navigation ? 1080 : 1440}
                   priority
-                  alt="Next.js Conf image"
-                  onLoad={() => setLoaded(true)}
+                  alt="Gallery image"
+                  onLoad={() => {
+                    setLoaded(true);
+                    setImageLoading(false);
+                    setImageError(false);
+                  }}
+                  onError={() => {
+                    setImageLoading(false);
+                    setImageError(true);
+                  }}
+                  onLoadStart={() => {
+                    setImageLoading(true);
+                    setImageError(false);
+                  }}
+                  className="max-w-full max-h-full object-contain"
+                  style={{
+                    maxWidth: "calc(100vw - 2rem)",
+                    maxHeight: "calc(100vh - 2rem)"
+                  }}
                 />
               </motion.div>
             </AnimatePresence>
@@ -89,59 +157,59 @@ export default function SharedModal({
         </div>
 
         {/* Buttons + bottom nav bar */}
-        <div className="absolute inset-0 mx-auto flex max-w-7xl items-center justify-center">
+        <div className="absolute inset-0 mx-auto flex items-center justify-center pointer-events-none">
           {/* Buttons */}
           {loaded && (
-            <div className="relative aspect-[3/2] max-h-full w-full">
+            <div className="relative w-full h-full max-w-7xl pointer-events-none">
               {navigation && (
                 <>
-                  {index > 0 && (
+                  {currentImageIndex > 0 && (
                     <button
-                      className="absolute left-3 top-[calc(50%-16px)] rounded-full bg-black/50 p-3 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white focus:outline-none"
-                      style={{ transform: "translate3d(0, 0, 0)" }}
-                      onClick={() => changePhotoId(index - 1)}
+                      type="button"
+                      title="Previous image"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white focus:outline-none pointer-events-auto transform-gpu"
+                      onClick={() => {
+                        const prevImage = images?.[currentImageIndex - 1];
+                        if (prevImage) {
+                          changePhotoId(prevImage.id);
+                        }
+                      }}
                     >
                       <ChevronLeftIcon className="h-6 w-6" />
                     </button>
                   )}
-                  {index + 1 < images.length && (
+                  {currentImageIndex < (images?.length || 0) - 1 && (
                     <button
-                      className="absolute right-3 top-[calc(50%-16px)] rounded-full bg-black/50 p-3 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white focus:outline-none"
-                      style={{ transform: "translate3d(0, 0, 0)" }}
-                      onClick={() => changePhotoId(index + 1)}
+                      type="button"
+                      title="Next image"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white focus:outline-none pointer-events-auto transform-gpu"
+                      onClick={() => {
+                        const nextImage = images?.[currentImageIndex + 1];
+                        if (nextImage) {
+                          changePhotoId(nextImage.id);
+                        }
+                      }}
                     >
                       <ChevronRightIcon className="h-6 w-6" />
                     </button>
                   )}
                 </>
               )}
-              <div className="absolute top-0 right-0 flex items-center gap-2 p-3 text-white">
-                {navigation ? (
-                  <a
-                    href={`https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/${currentImage.public_id}.${currentImage.format}`}
-                    className="rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
-                    target="_blank"
-                    title="Open fullsize version"
-                    rel="noreferrer"
-                  >
-                    <ArrowTopRightOnSquareIcon className="h-5 w-5" />
-                  </a>
-                ) : (
-                  <a
-                    href={`https://twitter.com/intent/tweet?text=Check%20out%20this%20pic%20from%20Next.js%20Conf!%0A%0Ahttps://nextjsconf-pics.vercel.app/p/${index}`}
-                    className="rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
-                    target="_blank"
-                    title="Open fullsize version"
-                    rel="noreferrer"
-                  >
-                    <Twitter className="h-5 w-5" />
-                  </a>
-                )}
+              <div className="absolute top-0 right-0 flex items-center gap-2 p-3 text-white pointer-events-auto">
+                <a
+                  href={`https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/${currentImage.public_id}.${currentImage.format}`}
+                  className="rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
+                  target="_blank"
+                  title="Open fullsize version"
+                  rel="noreferrer"
+                >
+                  <ArrowTopRightOnSquareIcon className="h-5 w-5" />
+                </a>
                 <button
                   onClick={() =>
                     downloadPhoto(
                       `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/${currentImage.public_id}.${currentImage.format}`,
-                      `${index}.jpg`,
+                      `${currentImage.public_id}.jpg`,
                     )
                   }
                   className="rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
@@ -149,8 +217,17 @@ export default function SharedModal({
                 >
                   <ArrowDownTrayIcon className="h-5 w-5" />
                 </button>
+                {onDelete && (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="rounded-full bg-red-600/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-red-600/75 hover:text-white border border-red-500/30"
+                    title="Delete image"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                )}
               </div>
-              <div className="absolute top-0 left-0 flex items-center gap-2 p-3 text-white">
+              <div className="absolute top-0 left-0 flex items-center gap-2 p-3 text-white pointer-events-auto">
                 <button
                   onClick={() => closeModal()}
                   className="rounded-full bg-black/50 p-2 text-white/75 backdrop-blur-lg transition hover:bg-black/75 hover:text-white"
@@ -165,53 +242,97 @@ export default function SharedModal({
             </div>
           )}
           {/* Bottom Nav bar */}
-          {navigation && (
+          {navigation && filteredImages && (
             <div className="fixed inset-x-0 bottom-0 z-40 overflow-hidden bg-gradient-to-b from-black/0 to-black/60">
               <motion.div
                 initial={false}
                 className="mx-auto mt-6 mb-6 flex aspect-[3/2] h-14"
               >
                 <AnimatePresence initial={false}>
-                  {filteredImages.map(({ public_id, format, id }) => (
-                    <motion.button
-                      initial={{
-                        width: "0%",
-                        x: `${Math.max((index - 1) * -100, 15 * -100)}%`,
-                      }}
-                      animate={{
-                        scale: id === index ? 1.25 : 1,
-                        width: "100%",
-                        x: `${Math.max(index * -100, 15 * -100)}%`,
-                      }}
-                      exit={{ width: "0%" }}
-                      onClick={() => changePhotoId(id)}
-                      key={id}
-                      className={`${
-                        id === index
+                  {filteredImages.map((image) => {
+                    // Safety check for image properties
+                    if (!image || !image.public_id || !image.format) return null;
+
+                    const { public_id, format, id } = image;
+                    return (
+                      <motion.button
+                        initial={{
+                          width: "0%",
+                          x: `${Math.max((currentImageIndex - 1) * -100, 15 * -100)}%`,
+                        }}
+                        animate={{
+                          scale: id === index ? 1.25 : 1,
+                          width: "100%",
+                          x: `${Math.max(currentImageIndex * -100, 15 * -100)}%`,
+                        }}
+                        exit={{ width: "0%" }}
+                        onClick={() => changePhotoId(id)}
+                        key={id}
+                        className={`${id === index
                           ? "z-20 rounded-md shadow shadow-black/50"
                           : "z-10"
-                      } ${id === 0 ? "rounded-l-md" : ""} ${
-                        id === images.length - 1 ? "rounded-r-md" : ""
-                      } relative inline-block w-full shrink-0 transform-gpu overflow-hidden focus:outline-none`}
-                    >
-                      <Image
-                        alt="small photos on the bottom"
-                        width={180}
-                        height={120}
-                        className={`${
-                          id === index
+                          } ${id === 0 ? "rounded-l-md" : ""} ${id === (images?.length || 0) - 1 ? "rounded-r-md" : ""
+                          } relative inline-block w-full shrink-0 transform-gpu overflow-hidden focus:outline-none`}
+                      >
+                        <Image
+                          alt="small photos on the bottom"
+                          width={180}
+                          height={120}
+                          className={`${id === index
                             ? "brightness-110 hover:brightness-110"
-                            : "brightness-50 contrast-125 hover:brightness-75"
-                        } h-full transform object-cover transition`}
-                        src={`https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/c_scale,w_180/${public_id}.${format}`}
-                      />
-                    </motion.button>
-                  ))}
+                            : "brightness-60 contrast-125 hover:brightness-90"
+                            } h-full transform object-cover transition-all duration-300 ease-out rounded-sm`}
+                          src={`https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/c_scale,w_180/${public_id}.${format}`}
+                          onError={(e) => {
+                            // Hide broken image thumbnails
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </motion.button>
+                    );
+                  })}
                 </AnimatePresence>
               </motion.div>
             </div>
           )}
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        {showDeleteConfirm && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-50">
+            <div className="bg-gray-900 border border-gray-700/50 rounded-xl p-8 max-w-md mx-4 shadow-2xl">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-900/20 border border-red-500/30 mb-6">
+                  <TrashIcon className="h-8 w-8 text-red-400" />
+                </div>
+                <h3 className="text-white text-xl font-semibold mb-3">Delete Image</h3>
+                <p className="text-gray-300 text-sm mb-8 leading-relaxed">
+                  Are you sure you want to delete this image? This action cannot be undone and the image will be permanently removed from your gallery.
+                </p>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-6 py-2.5 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-all duration-200 font-medium border border-gray-600/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (onDelete && currentImage) {
+                      onDelete(currentImage.id);
+                      setShowDeleteConfirm(false);
+                      closeModal();
+                    }
+                  }}
+                  className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-all duration-200 font-medium shadow-lg hover:shadow-red-500/25"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </MotionConfig>
   );
